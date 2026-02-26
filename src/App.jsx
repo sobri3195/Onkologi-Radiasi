@@ -6,6 +6,7 @@ const asNumber = (v) => Number(v || 0);
 const RECENT_LIMIT = 4;
 
 function App() {
+  const sidebarRef = useRef(null);
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => localStorage.getItem('sidebar_collapsed') === 'true');
