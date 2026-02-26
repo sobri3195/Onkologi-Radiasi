@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { allCalculators, calculatorCategories } from './calculators';
 import './styles.css';
 
@@ -76,15 +76,15 @@ function App() {
   });
 
   useEffect(() => {
-    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(isSidebarCollapsed));
+    localStorage.setItem('sidebar_collapsed', String(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
 
   useEffect(() => {
-    localStorage.setItem(PINNED_KEY, JSON.stringify(pinnedIds));
+    localStorage.setItem('quick_pinned_calculators', JSON.stringify(pinnedIds));
   }, [pinnedIds]);
 
   useEffect(() => {
-    localStorage.setItem(RECENT_KEY, JSON.stringify(recentIds));
+    localStorage.setItem('quick_recent_calculators', JSON.stringify(recentIds));
   }, [recentIds]);
 
   useEffect(() => {
@@ -102,56 +102,14 @@ function App() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  useEffect(() => {
-    if (!isMobileDrawerOpen || !isMobile) return undefined;
-
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        setIsMobileDrawerOpen(false);
-        return;
-      }
-
-      if (event.key !== 'Tab' || !sidebarRef.current) return;
-      const focusables = sidebarRef.current.querySelectorAll(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-      );
-
-      if (!focusables.length) return;
-      const first = focusables[0];
-      const last = focusables[focusables.length - 1];
-
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-
-    document.body.style.overflow = 'hidden';
-    document.addEventListener('keydown', handleKeyDown);
-    sidebarRef.current?.querySelector('button, input, select')?.focus();
-
-    return () => {
-      document.body.style.overflow = '';
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isMobileDrawerOpen, isMobile]);
-
-  const categoryCounts = useMemo(
-    () => Object.fromEntries(calculatorCategories.map((cat) => [cat.id, cat.calculators.length])),
-    []
-  );
-
   const filteredCategories = useMemo(() => {
+    const search = query.toLowerCase().trim();
     return calculatorCategories
       .map((category) => ({
         ...category,
         calculators: category.calculators.filter((calc) => {
           const byCategory = selectedCategory === 'all' || category.id === selectedCategory;
-          const bySearch = `${calc.name} ${category.title}`.toLowerCase().includes(query.toLowerCase());
+          const bySearch = `${calc.name} ${category.title}`.toLowerCase().includes(search);
           return byCategory && bySearch;
         })
       }))
@@ -170,29 +128,42 @@ function App() {
     categories: calculatorCategories.length
   };
 
-  const touchRecent = (calcId) => {
-    setRecentIds((prev) => [calcId, ...prev.filter((id) => id !== calcId)].slice(0, 8));
+  const selectedCategoryTitle = selectedCategory === 'all'
+    ? 'Semua Kategori'
+    : calculatorCategories.find((category) => category.id === selectedCategory)?.title || 'Kategori';
+
+  const activeFiltersCount = Number(query.trim().length > 0) + Number(selectedCategory !== 'all');
+
+  const calculatorsById = useMemo(
+    () => Object.fromEntries(allCalculators.map((calc) => [calc.id, calc])),
+    []
+  );
+
+  const quickAccessItems = useMemo(() => {
+    const pinnedItems = pinnedIds.map((id) => calculatorsById[id]).filter(Boolean);
+    const recentItems = recentIds
+      .filter((id) => !pinnedIds.includes(id))
+      .map((id) => calculatorsById[id])
+      .filter(Boolean);
+    return [...pinnedItems, ...recentItems].slice(0, RECENT_LIMIT + 2);
+  }, [calculatorsById, pinnedIds, recentIds]);
+
+  const handleCategorySelect = (categoryId) => {
+    setSelectedCategory(categoryId);
+    setIsMobileSidebarOpen(false);
   };
 
-  const togglePin = (calcId) => {
-    setPinnedIds((prev) => (prev.includes(calcId) ? prev.filter((id) => id !== calcId) : [calcId, ...prev].slice(0, 8)));
+  const registerRecent = (calculatorId) => {
+    setRecentIds((prev) => [calculatorId, ...prev.filter((id) => id !== calculatorId)].slice(0, RECENT_LIMIT));
   };
 
-  const focusCalculator = (calcId) => {
-    const calc = calculatorsById[calcId];
-    if (!calc) return;
-    setSelectedCategory(calc.categoryId);
-    setQuery('');
-    touchRecent(calcId);
-    if (isMobile) setIsMobileDrawerOpen(false);
-    requestAnimationFrame(() => {
-      const el = document.getElementById(`calc-${calcId}`);
-      el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
+  const togglePin = (calculatorId) => {
+    setPinnedIds((prev) => (
+      prev.includes(calculatorId)
+        ? prev.filter((id) => id !== calculatorId)
+        : [calculatorId, ...prev]
+    ));
   };
-
-  const quickPinned = pinnedIds.map((id) => calculatorsById[id]).filter(Boolean);
-  const quickRecent = recentIds.filter((id) => !pinnedIds.includes(id)).map((id) => calculatorsById[id]).filter(Boolean);
 
   const applyPreset = (calcId, preset) => {
     setValues((prev) => ({
@@ -246,102 +217,159 @@ function App() {
   };
 
   return (
-    <div className={`layout ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+    <div className={`app-shell ${isMobileSidebarOpen ? 'sidebar-open' : ''}`}>
       <button
-        className="hamburger"
+        className="mobile-menu-btn"
         type="button"
-        aria-label="Buka menu"
-        aria-expanded={isMobileDrawerOpen}
-        onClick={() => setIsMobileDrawerOpen((prev) => !prev)}
+        onClick={() => setIsMobileSidebarOpen((prev) => !prev)}
       >
-        ☰
+        ☰ Menu
       </button>
+      <div className="sidebar-backdrop" onClick={() => setIsMobileSidebarOpen(false)} aria-hidden="true" />
 
-      {isMobile && isMobileDrawerOpen && <button className="drawer-overlay" aria-label="Tutup menu" onClick={() => setIsMobileDrawerOpen(false)} />}
-
-      <aside
-        ref={sidebarRef}
-        className={`sidebar ${isMobileDrawerOpen ? 'drawer-open' : ''}`}
-        aria-hidden={isMobile && !isMobileDrawerOpen}
-      >
-        <div className="sidebar-header">
-          <div>
-            <h1>Onkologi Radiasi</h1>
-            {!isSidebarCollapsed && <p>Admin Panel Perhitungan Klinis</p>}
-          </div>
-          <button
-            className="collapse-btn"
-            type="button"
-            onClick={() => setIsSidebarCollapsed((prev) => !prev)}
-            aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            {isSidebarCollapsed ? '»' : '«'}
-          </button>
-        </div>
-
-        {!isSidebarCollapsed && (
-          <>
+      <div className={`layout ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+        <aside className="sidebar">
+          <div className="sidebar-block brand-block">
+            <div>
+              <h1>{isSidebarCollapsed ? 'OR' : 'Onkologi Radiasi'}</h1>
+              {!isSidebarCollapsed && <p>Admin Panel Perhitungan Klinis</p>}
+            </div>
+            <button
+              type="button"
+              className="collapse-btn"
+              onClick={() => setIsSidebarCollapsed((prev) => !prev)}
+              title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              {isSidebarCollapsed ? '→' : '←'}
+            </button>
             <div className="stat-grid">
               <div><strong>{stats.total}</strong><span>Fitur</span></div>
               <div><strong>{stats.categories}</strong><span>Kategori</span></div>
               <div><strong>{stats.visible}</strong><span>Aktif</span></div>
             </div>
+          </div>
 
-            <label htmlFor="search-input">Cari fitur</label>
-            <input
-              id="search-input"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="BED, DVH, IMRT..."
-            />
+          <div className="sidebar-block filter-block">
+            <div className="input-group">
+              <label htmlFor="search-calc">Cari fitur</label>
+              <input
+                id="search-calc"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="BED, DVH, IMRT..."
+              />
+            </div>
+            <div className="input-group">
+              <label htmlFor="category-select">Kategori aktif</label>
+              <select id="category-select" value={selectedCategory} onChange={(e) => handleCategorySelect(e.target.value)}>
+                <option value="all">Semua Kategori ({categoryCountMap.all})</option>
+                {calculatorCategories.map((category) => (
+                  <option key={category.id} value={category.id}>{category.title} ({categoryCountMap[category.id]})</option>
+                ))}
+              </select>
+            </div>
+            <div className="filter-indicator">Filter aktif: {activeFiltersCount}</div>
+          </div>
 
-            <section className="sidebar-section">
-              <h3>Kategori</h3>
-              <div className="category-list" role="listbox" aria-label="Filter kategori">
+          <div className="sidebar-block nav-block">
+            <h4>Quick Access</h4>
+            <ul className="quick-list">
+              {quickAccessItems.length === 0 && <li className="empty-state">Belum ada pinned/recent.</li>}
+              {quickAccessItems.map((calc) => (
+                <li key={`quick-${calc.id}`}>
+                  <button type="button" onClick={() => handleCategorySelect(calc.categoryId)}>
+                    <span>{calc.name}</span>
+                    <small>{calc.categoryTitle}</small>
+                  </button>
+                </li>
+              ))}
+            </ul>
+
+            <h4>Kategori</h4>
+            <ul className="category-list">
+              <li>
                 <button
                   type="button"
-                  className={`category-item ${selectedCategory === 'all' ? 'active' : ''}`}
-                  onClick={() => setSelectedCategory('all')}
+                  className={selectedCategory === 'all' ? 'active' : ''}
+                  onClick={() => handleCategorySelect('all')}
                 >
                   <span>Semua Kategori</span>
-                  <span className="badge">{stats.total}</span>
+                  <strong>{categoryCountMap.all}</strong>
                 </button>
-                {calculatorCategories.map((category) => (
+              </li>
+              {calculatorCategories.map((category) => (
+                <li key={category.id}>
                   <button
-                    key={category.id}
                     type="button"
-                    className={`category-item ${selectedCategory === category.id ? 'active' : ''}`}
-                    onClick={() => setSelectedCategory(category.id)}
+                    className={selectedCategory === category.id ? 'active' : ''}
+                    onClick={() => handleCategorySelect(category.id)}
                   >
                     <span>{category.title}</span>
-                    <span className="badge">{categoryCounts[category.id]}</span>
+                    <strong>{categoryCountMap[category.id]}</strong>
                   </button>
-                ))}
-              </div>
-            </section>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </aside>
 
-            <section className="sidebar-section">
-              <h3>Quick Access</h3>
-              <p className="quick-caption">Pinned + Recent</p>
+        <main className="content">
+          <div className="context-bar">
+            <span>Home / Kalkulator / {selectedCategoryTitle}</span>
+            <strong>{activeFiltersCount > 0 ? `${activeFiltersCount} filter berjalan` : 'Tanpa filter aktif'}</strong>
+          </div>
+          {filteredCategories.map((category) => (
+            <section key={category.id}>
+              <h2>{category.title}</h2>
+              <div className="grid">
+                {category.calculators.map((calc) => {
+                  const payload = Object.fromEntries(
+                    Object.entries(values[calc.id]).map(([k, v]) => [k, asNumber(v)])
+                  );
+                  const result = calc.compute(payload);
+                  const output = calc.formatter ? calc.formatter(result) : Number.isFinite(result) ? result.toFixed(4) : '∞';
+                  const isPinned = pinnedIds.includes(calc.id);
 
-              <div className="quick-group">
-                <strong>Pinned</strong>
-                {quickPinned.length === 0 && <small>Belum ada kalkulator pinned.</small>}
-                {quickPinned.map((calc) => (
-                  <button key={`p-${calc.id}`} type="button" className="quick-item" onClick={() => focusCalculator(calc.id)}>
-                    {calc.name}
-                  </button>
-                ))}
-              </div>
-
-              <div className="quick-group">
-                <strong>Recent</strong>
-                {quickRecent.length === 0 && <small>Belum ada aktivitas terbaru.</small>}
-                {quickRecent.slice(0, 5).map((calc) => (
-                  <button key={`r-${calc.id}`} type="button" className="quick-item" onClick={() => focusCalculator(calc.id)}>
-                    {calc.name}
-                  </button>
-                ))}
+                  return (
+                    <article
+                      key={calc.id}
+                      className="card"
+                      style={{ borderTop: `4px solid ${category.color}` }}
+                      onMouseEnter={() => registerRecent(calc.id)}
+                    >
+                      <header>
+                        <small>#{calc.id}</small>
+                        <div className="card-title-row">
+                          <h3>{calc.name}</h3>
+                          <button type="button" className="pin-btn" onClick={() => togglePin(calc.id)}>
+                            {isPinned ? '★' : '☆'}
+                          </button>
+                        </div>
+                      </header>
+                      {calc.fields.map(([fieldKey, label]) => (
+                        <label key={fieldKey}>
+                          <span>{label}</span>
+                          <input
+                            type="number"
+                            step="any"
+                            value={values[calc.id][fieldKey]}
+                            onFocus={() => registerRecent(calc.id)}
+                            onChange={(e) =>
+                              setValues((prev) => ({
+                                ...prev,
+                                [calc.id]: { ...prev[calc.id], [fieldKey]: e.target.value }
+                              }))
+                            }
+                          />
+                        </label>
+                      ))}
+                      <div className="result">
+                        <span>Hasil</span>
+                        <strong>{output} {calc.unit !== 'status' ? calc.unit : ''}</strong>
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
             </section>
           </>
