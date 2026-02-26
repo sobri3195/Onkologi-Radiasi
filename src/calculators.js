@@ -113,6 +113,71 @@ const categories = [
   }
 ];
 
+
+const hardRangeDefaults = [
+  { pattern: /(fraction|ratio|ntcp|tcp|m$|gamma$|outputfactor|tpr|tmr|conformity|oarsparing|targetcoverage|rbe|alpha|beta|k$|duty|survival)/i, min: 0, max: 10 },
+  { pattern: /(percent|%|v95|v50|d2|d50|d98|dose point)/i, min: 0, max: 1000 },
+  { pattern: /(distance|depth|diameter|margin|cm|length)/i, min: 0, max: 300 },
+  { pattern: /(time|days|hr|sec)/i, min: 0, max: 3650 },
+  { pattern: /(dose|gy|cgy|td50|d50|d0|half|activity|ci|mu|volume|cells|fractions|ssd|field size|po2)/i, min: 0, max: 10000 }
+];
+
+const recommendedRangeDefaults = [
+  { pattern: /(fraction|ratio|ntcp|tcp|conformity|oarsparing|targetcoverage|rbe|alpha|beta|survival)/i, min: 0, max: 1.5 },
+  { pattern: /(distance|depth|diameter|margin|cm|length)/i, min: 0, max: 50 },
+  { pattern: /(time|days)/i, min: 0, max: 365 },
+  { pattern: /(hr)/i, min: 0, max: 48 },
+  { pattern: /(sec)/i, min: 0, max: 120 },
+  { pattern: /(fractions)/i, min: 1, max: 45 },
+  { pattern: /(dose|gy|cgy|td50|d50|d0)/i, min: 0, max: 100 },
+  { pattern: /(activity|ci)/i, min: 0, max: 30 },
+  { pattern: /(volume|cc)/i, min: 0, max: 5000 },
+  { pattern: /(cells)/i, min: 0, max: 1000000000 }
+];
+
+const inferRange = (sourceText, defaults, fallbackMin, fallbackMax) => {
+  const lower = sourceText.toLowerCase();
+  const matched = defaults.find(({ pattern }) => pattern.test(lower));
+  return {
+    min: matched?.min ?? fallbackMin,
+    max: matched?.max ?? fallbackMax
+  };
+};
+
+const normalizeField = (field) => {
+  if (Array.isArray(field)) {
+    const [key, label, defaultValue] = field;
+    const source = `${key} ${label}`;
+    const hardRange = inferRange(source, hardRangeDefaults, -1000000, 1000000);
+    const recommendedRange = inferRange(source, recommendedRangeDefaults, hardRange.min, hardRange.max);
+    const unitMatch = /\(([^)]+)\)/.exec(label);
+    return {
+      key,
+      label,
+      defaultValue,
+      unit: unitMatch?.[1] ?? '',
+      min: hardRange.min,
+      max: hardRange.max,
+      recommendedMin: recommendedRange.min,
+      recommendedMax: recommendedRange.max,
+      helperText: `Rentang rekomendasi ${recommendedRange.min} - ${recommendedRange.max}${unitMatch?.[1] ? ` ${unitMatch[1]}` : ''}`
+    };
+  }
+
+  const source = `${field.key} ${field.label}`;
+  const hardRange = inferRange(source, hardRangeDefaults, -1000000, 1000000);
+  const recommendedRange = inferRange(source, recommendedRangeDefaults, hardRange.min, hardRange.max);
+  return {
+    unit: '',
+    min: hardRange.min,
+    max: hardRange.max,
+    recommendedMin: recommendedRange.min,
+    recommendedMax: recommendedRange.max,
+    helperText: '',
+    ...field
+  };
+};
+
 function erf(x) {
   const sign = x < 0 ? -1 : 1;
   const absX = Math.abs(x);
@@ -127,7 +192,15 @@ function erf(x) {
   return sign * y;
 }
 
-export const calculatorCategories = categories;
-export const allCalculators = categories.flatMap((category) =>
+const categoriesWithValidation = categories.map((category) => ({
+  ...category,
+  calculators: category.calculators.map((calculator) => ({
+    ...calculator,
+    fields: calculator.fields.map(normalizeField)
+  }))
+}));
+
+export const calculatorCategories = categoriesWithValidation;
+export const allCalculators = categoriesWithValidation.flatMap((category) =>
   category.calculators.map((calculator) => ({ ...calculator, categoryId: category.id, categoryTitle: category.title, color: category.color }))
 );

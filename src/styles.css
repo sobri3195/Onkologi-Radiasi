@@ -354,3 +354,38 @@ body { margin: 0; }
     padding: 4rem .8rem .8rem;
   }
 }
+
+.helper-text {
+  display: block;
+  color: #64748b;
+  font-size: .7rem;
+  margin-top: .2rem;
+}
+
+.field-feedback {
+  display: block;
+  margin-top: .18rem;
+  font-size: .72rem;
+}
+
+.field-feedback.error {
+  color: #b91c1c;
+}
+
+.field-feedback.warning {
+  color: #b45309;
+}
+
+.card label.input-error input {
+  border-color: #ef4444;
+  background: #fef2f2;
+}
+
+.card label.input-warning input {
+  border-color: #f59e0b;
+  background: #fffbeb;
+}
+
+.result-blocked {
+  color: #b91c1c;
+}
