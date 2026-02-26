@@ -6,6 +6,7 @@ const asNumber = (v) => Number(v || 0);
 const SIDEBAR_COLLAPSED_KEY = 'onkologi.sidebar.collapsed';
 const PINNED_KEY = 'onkologi.quick.pinned';
 const RECENT_KEY = 'onkologi.quick.recent';
+const PRESETS_KEY = 'onkologi.calc.presets';
 const MOBILE_BREAKPOINT = 960;
 
 const readJson = (key, fallback) => {
@@ -19,6 +20,42 @@ const readJson = (key, fallback) => {
   }
 };
 
+const presetId = (id) => `preset-${id}`;
+
+const sanitizePresetValues = (calc, inputValues = {}) => {
+  const baseValues = Object.fromEntries(calc.fields.map(([key, _label, defaultValue]) => [key, defaultValue]));
+  return {
+    ...baseValues,
+    ...Object.fromEntries(Object.entries(inputValues).filter(([key]) => key in baseValues))
+  };
+};
+
+const getDefaultPresets = (calc) => {
+  const base = {
+    id: 'default-base',
+    name: 'Default',
+    values: Object.fromEntries(calc.fields.map(([key, _label, defaultValue]) => [key, defaultValue]))
+  };
+  const presets = [base];
+  const keys = new Set(calc.fields.map(([key]) => key));
+
+  if (keys.has('totalDose') && keys.has('dosePerFx')) {
+    presets.push(
+      { id: 'default-60gy-30fx', name: '60Gy/30fx', values: sanitizePresetValues(calc, { totalDose: 60, dosePerFx: 2 }) },
+      { id: 'default-70gy-35fx', name: '70Gy/35fx', values: sanitizePresetValues(calc, { totalDose: 70, dosePerFx: 2 }) }
+    );
+  }
+
+  if (keys.has('prescribedDoseGy') && keys.has('numberOfFractions')) {
+    presets.push(
+      { id: 'default-60gy-30fx', name: '60Gy/30fx', values: sanitizePresetValues(calc, { prescribedDoseGy: 60, numberOfFractions: 30 }) },
+      { id: 'default-70gy-35fx', name: '70Gy/35fx', values: sanitizePresetValues(calc, { prescribedDoseGy: 70, numberOfFractions: 35 }) }
+    );
+  }
+
+  return presets;
+};
+
 function App() {
   const sidebarRef = useRef(null);
   const [query, setQuery] = useState('');
@@ -28,6 +65,8 @@ function App() {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= MOBILE_BREAKPOINT);
   const [pinnedIds, setPinnedIds] = useState(() => readJson(PINNED_KEY, []));
   const [recentIds, setRecentIds] = useState(() => readJson(RECENT_KEY, []));
+  const [customPresets, setCustomPresets] = useState(() => readJson(PRESETS_KEY, {}));
+  const [selectedPresetByCalc, setSelectedPresetByCalc] = useState({});
   const [values, setValues] = useState(() => {
     const initial = {};
     allCalculators.forEach((calc) => {
@@ -47,6 +86,10 @@ function App() {
   useEffect(() => {
     localStorage.setItem(RECENT_KEY, JSON.stringify(recentIds));
   }, [recentIds]);
+
+  useEffect(() => {
+    localStorage.setItem(PRESETS_KEY, JSON.stringify(customPresets));
+  }, [customPresets]);
 
   useEffect(() => {
     const onResize = () => {
@@ -116,6 +159,10 @@ function App() {
   }, [query, selectedCategory]);
 
   const calculatorsById = useMemo(() => Object.fromEntries(allCalculators.map((calc) => [calc.id, calc])), []);
+  const defaultPresetsByCalc = useMemo(
+    () => Object.fromEntries(allCalculators.map((calc) => [calc.id, getDefaultPresets(calc)])),
+    []
+  );
 
   const stats = {
     total: allCalculators.length,
@@ -146,6 +193,57 @@ function App() {
 
   const quickPinned = pinnedIds.map((id) => calculatorsById[id]).filter(Boolean);
   const quickRecent = recentIds.filter((id) => !pinnedIds.includes(id)).map((id) => calculatorsById[id]).filter(Boolean);
+
+  const applyPreset = (calcId, preset) => {
+    setValues((prev) => ({
+      ...prev,
+      [calcId]: { ...preset.values }
+    }));
+    setSelectedPresetByCalc((prev) => ({ ...prev, [calcId]: preset.id }));
+    touchRecent(calcId);
+  };
+
+  const resetCalculator = (calc) => {
+    const basePreset = defaultPresetsByCalc[calc.id][0];
+    applyPreset(calc.id, basePreset);
+  };
+
+  const saveCustomPreset = (calc) => {
+    const customName = window.prompt('Nama preset custom:');
+    if (!customName?.trim()) return;
+    const newPreset = {
+      id: presetId(Date.now()),
+      name: customName.trim(),
+      values: { ...values[calc.id] }
+    };
+    setCustomPresets((prev) => ({
+      ...prev,
+      [calc.id]: [...(prev[calc.id] || []), newPreset]
+    }));
+    setSelectedPresetByCalc((prev) => ({ ...prev, [calc.id]: newPreset.id }));
+  };
+
+  const renameCustomPreset = (calcId, presetIdValue) => {
+    const targetPreset = (customPresets[calcId] || []).find((preset) => preset.id === presetIdValue);
+    if (!targetPreset) return;
+    const newName = window.prompt('Nama baru preset:', targetPreset.name);
+    if (!newName?.trim()) return;
+    setCustomPresets((prev) => ({
+      ...prev,
+      [calcId]: (prev[calcId] || []).map((preset) => (preset.id === presetIdValue ? { ...preset, name: newName.trim() } : preset))
+    }));
+  };
+
+  const deleteCustomPreset = (calcId, presetIdValue) => {
+    setCustomPresets((prev) => ({
+      ...prev,
+      [calcId]: (prev[calcId] || []).filter((preset) => preset.id !== presetIdValue)
+    }));
+    setSelectedPresetByCalc((prev) => {
+      if (prev[calcId] !== presetIdValue) return prev;
+      return { ...prev, [calcId]: 'default-base' };
+    });
+  };
 
   return (
     <div className={`layout ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
@@ -262,6 +360,10 @@ function App() {
                 const result = calc.compute(payload);
                 const output = calc.formatter ? calc.formatter(result) : Number.isFinite(result) ? result.toFixed(4) : '∞';
                 const isPinned = pinnedIds.includes(calc.id);
+                const presets = [...defaultPresetsByCalc[calc.id], ...(customPresets[calc.id] || [])];
+                const selectedPresetId = selectedPresetByCalc[calc.id] || 'default-base';
+                const selectedPreset = presets.find((preset) => preset.id === selectedPresetId) || presets[0];
+                const selectedIsCustom = (customPresets[calc.id] || []).some((preset) => preset.id === selectedPreset.id);
 
                 return (
                   <article
@@ -300,6 +402,30 @@ function App() {
                         />
                       </label>
                     ))}
+                    <div className="preset-panel">
+                      <label>
+                        <span>Preset Klinis</span>
+                        <select
+                          value={selectedPreset.id}
+                          onChange={(e) => setSelectedPresetByCalc((prev) => ({ ...prev, [calc.id]: e.target.value }))}
+                        >
+                          {presets.map((preset) => (
+                            <option key={preset.id} value={preset.id}>{preset.name}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <div className="preset-actions">
+                        <button type="button" className="ghost-btn" onClick={() => applyPreset(calc.id, selectedPreset)}>Apply Preset</button>
+                        <button type="button" className="ghost-btn" onClick={() => resetCalculator(calc)}>Reset</button>
+                        <button type="button" className="ghost-btn" onClick={() => saveCustomPreset(calc)}>Simpan Custom</button>
+                        {selectedIsCustom && (
+                          <>
+                            <button type="button" className="ghost-btn" onClick={() => renameCustomPreset(calc.id, selectedPreset.id)}>Rename</button>
+                            <button type="button" className="ghost-btn danger" onClick={() => deleteCustomPreset(calc.id, selectedPreset.id)}>Delete</button>
+                          </>
+                        )}
+                      </div>
+                    </div>
                     <div className="result">
                       <span>Hasil</span>
                       <strong>{output} {calc.unit !== 'status' ? calc.unit : ''}</strong>

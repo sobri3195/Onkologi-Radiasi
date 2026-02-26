@@ -162,6 +162,13 @@ body { margin: 0; }
   border-radius: .45rem;
   border: 1px solid #cbd5e1;
 }
+.card select {
+  width: 100%;
+  padding: .45rem;
+  border-radius: .45rem;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+}
 .pin-btn {
   border: 1px solid #bfdbfe;
   background: #eff6ff;
@@ -181,6 +188,34 @@ body { margin: 0; }
   margin-top: .5rem;
   padding-top: .5rem;
   border-top: 1px solid #e2e8f0;
+}
+
+.preset-panel {
+  border-top: 1px dashed #cbd5e1;
+  padding-top: .55rem;
+  margin-top: .45rem;
+}
+
+.preset-actions {
+  margin-top: .45rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem;
+}
+
+.ghost-btn {
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  border-radius: .4rem;
+  padding: .28rem .5rem;
+  font-size: .76rem;
+  cursor: pointer;
+}
+
+.ghost-btn.danger {
+  border-color: #fecaca;
+  color: #b91c1c;
+  background: #fff1f2;
 }
 
 .drawer-overlay {
