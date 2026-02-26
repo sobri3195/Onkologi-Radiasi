@@ -9,23 +9,50 @@ body { margin: 0; }
 
 .layout {
   display: grid;
-  grid-template-columns: 300px 1fr;
+  grid-template-columns: 320px 1fr;
   min-height: 100vh;
+  transition: grid-template-columns .25s ease;
+}
+
+.layout.sidebar-collapsed {
+  grid-template-columns: 86px 1fr;
+}
+
+.hamburger {
+  display: none;
+  position: fixed;
+  top: .8rem;
+  left: .8rem;
+  z-index: 30;
+  border: 1px solid #334155;
+  background: #0f172a;
+  color: #f8fafc;
+  border-radius: .55rem;
+  padding: .5rem .7rem;
 }
 
 .sidebar {
-  padding: 1.2rem;
+  padding: 1rem;
   background: #0f172a;
   color: #e2e8f0;
   position: sticky;
   top: 0;
   height: 100vh;
+  overflow-y: auto;
+  transition: width .25s ease, transform .25s ease, padding .25s ease;
 }
 
-.sidebar h1 { margin: 0 0 .25rem; font-size: 1.2rem; }
+.sidebar-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: .5rem;
+}
+
+.sidebar h1 { margin: 0 0 .25rem; font-size: 1.1rem; }
 .sidebar p { margin: 0 0 1rem; opacity: .8; }
 .sidebar label { display: block; margin-top: 1rem; margin-bottom: .35rem; font-size: .85rem; }
-.sidebar input, .sidebar select {
+.sidebar input {
   width: 100%;
   padding: .6rem;
   border-radius: .5rem;
@@ -34,10 +61,21 @@ body { margin: 0; }
   color: #f1f5f9;
 }
 
+.collapse-btn {
+  border: 1px solid #334155;
+  background: #1e293b;
+  color: #e2e8f0;
+  border-radius: .45rem;
+  cursor: pointer;
+  min-width: 34px;
+  height: 34px;
+}
+
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: .5rem;
+  margin-top: .8rem;
 }
 .stat-grid div {
   background: #1e293b;
@@ -46,6 +84,51 @@ body { margin: 0; }
 }
 .stat-grid strong { display: block; color: #93c5fd; }
 .stat-grid span { font-size: .75rem; }
+
+.sidebar-section { margin-top: 1rem; }
+.sidebar-section h3 { margin: .3rem 0 .6rem; font-size: .95rem; }
+.quick-caption { margin: 0; opacity: .75; font-size: .8rem; }
+
+.category-list, .quick-group {
+  display: grid;
+  gap: .4rem;
+}
+
+.category-item, .quick-item {
+  width: 100%;
+  border: 1px solid #334155;
+  background: #1e293b;
+  color: #cbd5e1;
+  border-radius: .5rem;
+  padding: .5rem .6rem;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: all .2s ease;
+}
+
+.category-item.active {
+  border-color: #60a5fa;
+  background: #1d4ed8;
+  color: #eff6ff;
+}
+
+.category-item:hover, .quick-item:hover, .pin-btn:hover {
+  filter: brightness(1.12);
+}
+
+.badge {
+  font-size: .72rem;
+  border-radius: 999px;
+  background: #334155;
+  color: #f8fafc;
+  padding: .12rem .5rem;
+}
+
+.quick-group strong { font-size: .8rem; margin-top: .2rem; }
+.quick-group small { opacity: .7; }
 
 .content { padding: 1rem; }
 .content h2 { margin-bottom: .5rem; }
@@ -61,6 +144,13 @@ body { margin: 0; }
   border-radius: .75rem;
   padding: .75rem;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+  scroll-margin-top: 1rem;
+}
+.card header {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: .5rem;
 }
 .card header h3 { margin: .1rem 0 .7rem; font-size: 1rem; }
 .card small { color: #64748b; }
@@ -72,6 +162,19 @@ body { margin: 0; }
   border-radius: .45rem;
   border: 1px solid #cbd5e1;
 }
+.pin-btn {
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1e40af;
+  border-radius: .4rem;
+  padding: .3rem .5rem;
+  cursor: pointer;
+}
+.pin-btn.active {
+  border-color: #f59e0b;
+  background: #fef3c7;
+  color: #92400e;
+}
 .result {
   display: flex;
   justify-content: space-between;
@@ -80,7 +183,34 @@ body { margin: 0; }
   border-top: 1px solid #e2e8f0;
 }
 
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, .45);
+  z-index: 20;
+  border: 0;
+}
+
 @media (max-width: 960px) {
-  .layout { grid-template-columns: 1fr; }
-  .sidebar { position: static; height: auto; }
+  .layout, .layout.sidebar-collapsed { grid-template-columns: 1fr; }
+
+  .hamburger { display: block; }
+
+  .sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: min(88vw, 340px);
+    z-index: 25;
+    transform: translateX(-105%);
+    height: 100vh;
+  }
+
+  .sidebar.drawer-open {
+    transform: translateX(0);
+  }
+
+  .content {
+    padding-top: 3.5rem;
+  }
 }
