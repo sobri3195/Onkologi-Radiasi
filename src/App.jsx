@@ -66,18 +66,24 @@ function App() {
       <div className="layout">
         <aside className="sidebar">
           <div className="sidebar-block brand-block">
-            <h1>Onkologi Radiasi</h1>
-            <p>Admin Panel Perhitungan Klinis</p>
+            <div className="brand-head">
+              <img src="/logo-radiasi.svg" alt="Logo Onkologi Radiasi" className="brand-logo" />
+              <div>
+                <h1>Onkologi Radiasi</h1>
+                <p>Clinical Calculation Workspace</p>
+              </div>
+            </div>
+
             <div className="stat-grid">
               <div><strong>{stats.total}</strong><span>Total Kalkulator</span></div>
               <div><strong>{calculatorCategories.length}</strong><span>Kategori</span></div>
-              <div><strong>{stats.visible}</strong><span>Tampil</span></div>
+              <div><strong>{stats.visible}</strong><span>Ditampilkan</span></div>
             </div>
           </div>
 
           <div className="sidebar-block filter-block">
             <div className="input-group">
-              <label htmlFor="search-calc">Cari fitur</label>
+              <label htmlFor="search-calc">Cari kalkulator</label>
               <input
                 id="search-calc"
                 value={query}
@@ -86,7 +92,7 @@ function App() {
               />
             </div>
             <div className="input-group">
-              <label htmlFor="category-select">Kategori aktif</label>
+              <label htmlFor="category-select">Filter kategori</label>
               <select id="category-select" value={selectedCategory} onChange={(event) => setSelectedCategory(event.target.value)}>
                 <option value="all">Semua Kategori</option>
                 {calculatorCategories.map((category) => (
@@ -94,10 +100,36 @@ function App() {
                 ))}
               </select>
             </div>
+
+            <div className="category-chips">
+              <button
+                type="button"
+                className={`chip ${selectedCategory === 'all' ? 'active' : ''}`}
+                onClick={() => setSelectedCategory('all')}
+              >
+                Semua
+              </button>
+              {calculatorCategories.map((category) => (
+                <button
+                  key={category.id}
+                  type="button"
+                  className={`chip ${selectedCategory === category.id ? 'active' : ''}`}
+                  onClick={() => setSelectedCategory(category.id)}
+                >
+                  <span className="chip-dot" style={{ backgroundColor: category.color }} />
+                  {category.title}
+                </button>
+              ))}
+            </div>
           </div>
         </aside>
 
         <main className="content">
+          <div className="content-hero">
+            <h2>Dashboard Kalkulator Klinis</h2>
+            <p>Gunakan panel di kiri untuk mencari dan memfilter kalkulator dengan lebih cepat.</p>
+          </div>
+
           {filteredCategories.map((category) => (
             <section key={category.id}>
               <h2>{category.title}</h2>
