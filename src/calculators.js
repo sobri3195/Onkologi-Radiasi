@@ -26,7 +26,7 @@ const categories = [
       } },
       { id: 7, name: 'TAR', unit: 'ratio', fields: [['depthCm', 'Depth (cm)', 10], ['fieldSizeCm', 'Field size (cm)', 10], ['energyMv', 'Energy (MV)', 6]], compute: ({ depthCm, fieldSizeCm, energyMv }) => Math.exp(-(energyMv === 6 ? 0.04 : 0.03) * depthCm) * (1 + 0.01 * fieldSizeCm) },
       { id: 8, name: 'TMR', unit: 'ratio', fields: [['depthCm', 'Depth (cm)', 10], ['fieldSizeCm', 'Field size (cm)', 10]], compute: ({ depthCm, fieldSizeCm }) => (depthCm <= 1.5 ? 1 : Math.exp(-0.04 * (depthCm - 1.5)) * (1 + 0.01 * fieldSizeCm)) },
-      { id: 9, name: 'Monitor Unit', unit: 'MU', fields: [['doseCgy', 'Prescribed dose (cGy)', 200], ['outputFactor', 'Output factor', 1], ['tpr', 'TPR/TMR', 0.8]], compute: ({ doseCgy, outputFactor, tpr }) => safeDivide(doseCgy, outputFactor * tpr) },
+      { id: 9, name: 'Monitor Units Calculation', unit: 'MU', fields: [['doseCgy', 'Prescribed dose (cGy)', 200], ['outputFactor', 'Output factor', 1], ['tpr', 'TPR/TMR', 0.8]], compute: ({ doseCgy, outputFactor, tpr }) => safeDivide(doseCgy, outputFactor * tpr) },
       { id: 10, name: 'Dose Rate Brachy', unit: 'cGy/hr', fields: [['sourceActivityCi', 'Source activity (Ci)', 10], ['distanceCm', 'Distance (cm)', 1]], compute: ({ sourceActivityCi, distanceCm }) => ((sourceActivityCi * 1000 * 0.35) / (distanceCm ** 2)) * 0.95 }
     ]
   },
@@ -35,8 +35,8 @@ const categories = [
     title: 'Volume & Geometri',
     color: '#0d9488',
     calculators: [
-      { id: 11, name: 'Volume Sphere', unit: 'cc', fields: [['diameterCm', 'Diameter (cm)', 4]], compute: ({ diameterCm }) => (4 / 3) * Math.PI * (diameterCm / 2) ** 3 },
-      { id: 12, name: 'Volume Ellipsoid', unit: 'cc', fields: [['aCm', 'a (cm)', 3], ['bCm', 'b (cm)', 2], ['cCm', 'c (cm)', 2]], compute: ({ aCm, bCm, cCm }) => (4 / 3) * Math.PI * aCm * bCm * cCm },
+      { id: 11, name: 'Volume Tumor (Spherical)', unit: 'cc', fields: [['diameterCm', 'Diameter (cm)', 4]], compute: ({ diameterCm }) => (4 / 3) * Math.PI * (diameterCm / 2) ** 3 },
+      { id: 12, name: 'Volume Tumor (Ellipsoid)', unit: 'cc', fields: [['aCm', 'a (cm)', 3], ['bCm', 'b (cm)', 2], ['cCm', 'c (cm)', 2]], compute: ({ aCm, bCm, cCm }) => (4 / 3) * Math.PI * aCm * bCm * cCm },
       { id: 13, name: 'PTV', unit: 'cc', fields: [['gtvCc', 'GTV (cc)', 34], ['ctvMarginCm', 'CTV margin (cm)', 0.5], ['ptvMarginCm', 'PTV margin (cm)', 0.5]], compute: ({ gtvCc, ctvMarginCm, ptvMarginCm }) => {
         const gtvRadius = (3 * gtvCc / (4 * Math.PI)) ** (1 / 3);
         const ptvRadius = gtvRadius + ctvMarginCm + ptvMarginCm;
@@ -67,9 +67,9 @@ const categories = [
         const bsfMax = energyMv === 6 ? 1.04 : 1.02;
         return 1 + (bsfMax - 1) * (1 - Math.exp(-0.1 * fieldSizeCm));
       } },
-      { id: 26, name: 'Wedge Transmission', unit: 'ratio', fields: [['wedgeAngle', 'Wedge angle (°)', 45]], compute: ({ wedgeAngle }) => 1 - (wedgeAngle / 90) * 0.5 },
-      { id: 27, name: 'Tray Transmission', unit: 'ratio', fields: [['trayThicknessCm', 'Tray thickness (cm)', 1], ['energyMv', 'Energy (MV)', 6]], compute: ({ trayThicknessCm, energyMv }) => Math.exp(-(energyMv === 6 ? 0.05 : 0.03) * trayThicknessCm) },
-      { id: 28, name: 'TPR', unit: 'ratio', fields: [['depthCm', 'Depth (cm)', 10], ['fieldSizeCm', 'Field size (cm)', 10]], compute: ({ depthCm, fieldSizeCm }) => (depthCm <= 1.5 ? 1 : Math.exp(-0.04 * (depthCm - 1.5)) * (1 + 0.01 * fieldSizeCm)) },
+      { id: 26, name: 'Wedge Transmission Factor', unit: 'ratio', fields: [['wedgeAngle', 'Wedge angle (°)', 45]], compute: ({ wedgeAngle }) => 1 - (wedgeAngle / 90) * 0.5 },
+      { id: 27, name: 'Tray Transmission Factor', unit: 'ratio', fields: [['trayThicknessCm', 'Tray thickness (cm)', 1], ['energyMv', 'Energy (MV)', 6]], compute: ({ trayThicknessCm, energyMv }) => Math.exp(-(energyMv === 6 ? 0.05 : 0.03) * trayThicknessCm) },
+      { id: 28, name: 'Tissue Phantom Ratio (TPR)', unit: 'ratio', fields: [['depthCm', 'Depth (cm)', 10], ['fieldSizeCm', 'Field size (cm)', 10]], compute: ({ depthCm, fieldSizeCm }) => (depthCm <= 1.5 ? 1 : Math.exp(-0.04 * (depthCm - 1.5)) * (1 + 0.01 * fieldSizeCm)) },
       { id: 29, name: 'Collimator Scatter', unit: 'ratio', fields: [['fieldSizeCm', 'Field size (cm)', 10]], compute: ({ fieldSizeCm }) => 0.95 + 0.05 * (1 - Math.exp(-0.05 * fieldSizeCm)) },
       { id: 30, name: 'Phantom Scatter', unit: 'ratio', fields: [['fieldSizeCm', 'Field size (cm)', 10]], compute: ({ fieldSizeCm }) => 1 + 0.01 * fieldSizeCm * (1 - Math.exp(-0.05 * fieldSizeCm)) }
     ]
@@ -96,11 +96,11 @@ const categories = [
     title: 'Brachytherapy & Advanced',
     color: '#ea580c',
     calculators: [
-      { id: 41, name: 'Implant Activity', unit: 'Ci', fields: [['prescribedDoseGy', 'Prescribed dose (Gy)', 10], ['treatmentTimeHr', 'Treatment time (hr)', 24], ['distanceCm', 'Distance (cm)', 1]], compute: ({ prescribedDoseGy, treatmentTimeHr, distanceCm }) => (prescribedDoseGy * 100 * distanceCm ** 2) / (treatmentTimeHr * 0.35 * 1000 * 0.95) },
-      { id: 42, name: 'Paris Dosimetry', unit: 'cGy/hr', fields: [['lengthCm', 'Length (cm)', 10], ['activityPerCm', 'Activity per cm', 0.8]], compute: ({ lengthCm, activityPerCm }) => 0.85 * activityPerCm * lengthCm },
+      { id: 41, name: 'Brachytherapy Implant Activity', unit: 'Ci', fields: [['prescribedDoseGy', 'Prescribed dose (Gy)', 10], ['treatmentTimeHr', 'Treatment time (hr)', 24], ['distanceCm', 'Distance (cm)', 1]], compute: ({ prescribedDoseGy, treatmentTimeHr, distanceCm }) => (prescribedDoseGy * 100 * distanceCm ** 2) / (treatmentTimeHr * 0.35 * 1000 * 0.95) },
+      { id: 42, name: 'Paris System Dosimetry', unit: 'cGy/hr', fields: [['lengthCm', 'Length (cm)', 10], ['activityPerCm', 'Activity per cm', 0.8]], compute: ({ lengthCm, activityPerCm }) => 0.85 * activityPerCm * lengthCm },
       { id: 43, name: 'Source Decay Correction', unit: 'Ci', fields: [['initialActivity', 'Initial activity (Ci)', 10], ['timeDays', 'Time (days)', 30], ['halfLifeDays', 'Half-life (days)', 73.8]], compute: ({ initialActivity, timeDays, halfLifeDays }) => initialActivity * Math.exp(-Math.log(2) * timeDays / halfLifeDays) },
       { id: 44, name: 'IMRT Optimization Score', unit: 'score', fields: [['targetCoverage', 'Target coverage', 0.96], ['oarSparing', 'OAR sparing', 0.88], ['conformity', 'Conformity', 0.91]], compute: ({ targetCoverage, oarSparing, conformity }) => 0.5 * targetCoverage + 0.3 * oarSparing + 0.2 * conformity },
-      { id: 45, name: 'SBRT BED', unit: 'Gy', fields: [['prescribedDoseGy', 'Prescribed dose (Gy)', 48], ['numberOfFractions', 'Fractions', 4]], compute: ({ prescribedDoseGy, numberOfFractions }) => {
+      { id: 45, name: 'SBRT/SRS Dose Calculation', unit: 'Gy', fields: [['prescribedDoseGy', 'Prescribed dose (Gy)', 48], ['numberOfFractions', 'Fractions', 4]], compute: ({ prescribedDoseGy, numberOfFractions }) => {
         const dosePerFx = prescribedDoseGy / numberOfFractions;
         return prescribedDoseGy * (1 + dosePerFx / 10);
       } },
@@ -108,7 +108,7 @@ const categories = [
       { id: 47, name: 'Setup Margin (van Herk)', unit: 'cm', fields: [['systematicErrorCm', 'Systematic error (cm)', 0.3], ['randomErrorCm', 'Random error (cm)', 0.4]], compute: ({ systematicErrorCm, randomErrorCm }) => 2.5 * systematicErrorCm + 0.7 * randomErrorCm },
       { id: 48, name: 'Dose Constraint Evaluation', unit: 'status', fields: [['deliveredDose', 'Delivered dose', 28], ['constraintDose', 'Constraint dose', 30]], compute: ({ deliveredDose, constraintDose }) => (deliveredDose <= constraintDose ? 1 : 0), formatter: (value) => value === 1 ? 'PASS ✅' : 'FAIL ❌' },
       { id: 49, name: 'Total Treatment Time', unit: 'days', fields: [['numberOfFractions', 'Number of fractions', 39], ['fractionsPerWeek', 'Fractions/week', 5]], compute: ({ numberOfFractions, fractionsPerWeek }) => Math.ceil(numberOfFractions / fractionsPerWeek) * 7 },
-      { id: 50, name: 'OTT Correction', unit: 'Gy', fields: [['plannedDays', 'Planned days', 55], ['actualDays', 'Actual days', 60], ['doseLossPerDayGy', 'Dose loss/day (Gy)', 0.6]], compute: ({ plannedDays, actualDays, doseLossPerDayGy }) => (actualDays <= plannedDays ? 0 : (actualDays - plannedDays) * doseLossPerDayGy) }
+      { id: 50, name: 'Overall Treatment Time Correction', unit: 'Gy', fields: [['plannedDays', 'Planned days', 55], ['actualDays', 'Actual days', 60], ['doseLossPerDayGy', 'Dose loss/day (Gy)', 0.6]], compute: ({ plannedDays, actualDays, doseLossPerDayGy }) => (actualDays <= plannedDays ? 0 : (actualDays - plannedDays) * doseLossPerDayGy) }
     ]
   }
 ];
