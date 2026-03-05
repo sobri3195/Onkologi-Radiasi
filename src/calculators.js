@@ -110,6 +110,48 @@ const categories = [
       { id: 49, name: 'Total Treatment Time', unit: 'days', fields: [['numberOfFractions', 'Number of fractions', 39], ['fractionsPerWeek', 'Fractions/week', 5]], compute: ({ numberOfFractions, fractionsPerWeek }) => Math.ceil(numberOfFractions / fractionsPerWeek) * 7 },
       { id: 50, name: 'Overall Treatment Time Correction', unit: 'Gy', fields: [['plannedDays', 'Planned days', 55], ['actualDays', 'Actual days', 60], ['doseLossPerDayGy', 'Dose loss/day (Gy)', 0.6]], compute: ({ plannedDays, actualDays, doseLossPerDayGy }) => (actualDays <= plannedDays ? 0 : (actualDays - plannedDays) * doseLossPerDayGy) }
     ]
+
+  },
+  {
+    id: 'modul-lanjutan',
+    title: 'Modul Lanjutan',
+    color: '#ea580c',
+    calculators: [
+      { id: 51, name: 'Dose Escalation Gain', unit: '%', fields: [['standardDoseGy', 'Standard dose (Gy)', 70], ['escalatedDoseGy', 'Escalated dose (Gy)', 77]], compute: ({ standardDoseGy, escalatedDoseGy }) => safeDivide((escalatedDoseGy - standardDoseGy) * 100, standardDoseGy) },
+      { id: 52, name: 'BED Difference', unit: 'Gy', fields: [['doseA', 'Dose A (Gy)', 70], ['fractionsA', 'Fractions A', 35], ['doseB', 'Dose B (Gy)', 60], ['fractionsB', 'Fractions B', 30], ['alphaBeta', 'α/β', 10]], compute: ({ doseA, fractionsA, doseB, fractionsB, alphaBeta }) => {
+        const dA = safeDivide(doseA, fractionsA);
+        const dB = safeDivide(doseB, fractionsB);
+        const bedA = doseA * (1 + dA / alphaBeta);
+        const bedB = doseB * (1 + dB / alphaBeta);
+        return bedA - bedB;
+      } },
+      { id: 53, name: 'EQD2 Difference', unit: 'Gy', fields: [['bedA', 'BED plan A (Gy)', 84], ['bedB', 'BED plan B (Gy)', 72], ['alphaBeta', 'α/β', 10]], compute: ({ bedA, bedB, alphaBeta }) => {
+        const eqd2A = safeDivide(bedA, (1 + 2 / alphaBeta));
+        const eqd2B = safeDivide(bedB, (1 + 2 / alphaBeta));
+        return eqd2A - eqd2B;
+      } },
+      { id: 54, name: 'Tumor Control Gain', unit: '%', fields: [['tcpBaseline', 'TCP baseline (0-1)', 0.75], ['tcpNew', 'TCP new plan (0-1)', 0.83]], compute: ({ tcpBaseline, tcpNew }) => (tcpNew - tcpBaseline) * 100 },
+      { id: 55, name: 'NTCP Reduction', unit: '%', fields: [['ntcpBaseline', 'NTCP baseline (0-1)', 0.22], ['ntcpNew', 'NTCP new plan (0-1)', 0.15]], compute: ({ ntcpBaseline, ntcpNew }) => (ntcpBaseline - ntcpNew) * 100 },
+      { id: 56, name: 'Plan Benefit Index', unit: 'score', fields: [['tcpGainPercent', 'TCP gain (%)', 8], ['ntcpReductionPercent', 'NTCP reduction (%)', 7], ['weightTcp', 'Weight TCP', 0.6], ['weightNtcp', 'Weight NTCP', 0.4]], compute: ({ tcpGainPercent, ntcpReductionPercent, weightTcp, weightNtcp }) => (tcpGainPercent * weightTcp) + (ntcpReductionPercent * weightNtcp) },
+      { id: 57, name: 'Equivalent Uniform Dose (Linear)', unit: 'Gy', fields: [['meanDoseGy', 'Mean dose (Gy)', 66], ['heterogeneityPenalty', 'Heterogeneity penalty', 0.08]], compute: ({ meanDoseGy, heterogeneityPenalty }) => meanDoseGy * (1 - heterogeneityPenalty) },
+      { id: 58, name: 'Dose Fall-off Rate', unit: 'Gy/cm', fields: [['doseNearGy', 'Near dose (Gy)', 30], ['doseFarGy', 'Far dose (Gy)', 12], ['distanceCm', 'Distance interval (cm)', 2]], compute: ({ doseNearGy, doseFarGy, distanceCm }) => safeDivide(doseNearGy - doseFarGy, distanceCm) },
+      { id: 59, name: 'Residual Tumor Cell Fraction', unit: 'fraction', fields: [['alpha', 'Alpha', 0.25], ['doseGy', 'Dose delivered (Gy)', 70]], compute: ({ alpha, doseGy }) => Math.exp(-alpha * doseGy) },
+      { id: 60, name: 'Hypoxia Adjustment Factor', unit: 'ratio', fields: [['oer', 'OER', 2.5], ['hypoxicFraction', 'Hypoxic fraction', 0.3]], compute: ({ oer, hypoxicFraction }) => 1 + (oer - 1) * hypoxicFraction },
+      { id: 61, name: 'Corrected BED with Hypoxia', unit: 'Gy', fields: [['bedNormoxic', 'BED normoxic (Gy)', 84], ['hypoxiaFactor', 'Hypoxia factor', 1.45]], compute: ({ bedNormoxic, hypoxiaFactor }) => safeDivide(bedNormoxic, hypoxiaFactor) },
+      { id: 62, name: 'Biological Effective Dose Rate', unit: 'Gy/hr', fields: [['bedGy', 'BED (Gy)', 90], ['treatmentTimeHr', 'Treatment time (hr)', 0.5]], compute: ({ bedGy, treatmentTimeHr }) => safeDivide(bedGy, treatmentTimeHr) },
+      { id: 63, name: 'Adaptive Replan Trigger', unit: 'status', fields: [['currentVolumeCc', 'Current tumor volume (cc)', 50], ['baselineVolumeCc', 'Baseline tumor volume (cc)', 60], ['thresholdPercent', 'Threshold change (%)', 15]], compute: ({ currentVolumeCc, baselineVolumeCc, thresholdPercent }) => {
+        const reductionPercent = safeDivide((baselineVolumeCc - currentVolumeCc) * 100, baselineVolumeCc);
+        return reductionPercent >= thresholdPercent ? 1 : 0;
+      }, formatter: (value) => value === 1 ? 'REPLAN ✅' : 'MONITOR ⚠️' },
+      { id: 64, name: 'Inter-fraction Motion Margin', unit: 'cm', fields: [['systematicMotionCm', 'Systematic motion (cm)', 0.2], ['randomMotionCm', 'Random motion (cm)', 0.3]], compute: ({ systematicMotionCm, randomMotionCm }) => 2 * systematicMotionCm + 0.7 * randomMotionCm },
+      { id: 65, name: 'Combined Setup & Motion Margin', unit: 'cm', fields: [['setupMarginCm', 'Setup margin (cm)', 1.0], ['motionMarginCm', 'Motion margin (cm)', 0.6]], compute: ({ setupMarginCm, motionMarginCm }) => Math.sqrt((setupMarginCm ** 2) + (motionMarginCm ** 2)) },
+      { id: 66, name: 'Treatment Efficiency Index', unit: 'ratio', fields: [['beamOnTimeMin', 'Beam-on time (min)', 12], ['sessionSlotMin', 'Session slot (min)', 20]], compute: ({ beamOnTimeMin, sessionSlotMin }) => safeDivide(beamOnTimeMin, sessionSlotMin) },
+      { id: 67, name: 'Dose Delivery Accuracy', unit: '%', fields: [['plannedDoseGy', 'Planned dose (Gy)', 2], ['measuredDoseGy', 'Measured dose (Gy)', 1.96]], compute: ({ plannedDoseGy, measuredDoseGy }) => 100 - Math.abs(safeDivide((measuredDoseGy - plannedDoseGy) * 100, plannedDoseGy)) },
+      { id: 68, name: 'Cumulative OAR Burden', unit: 'Gy', fields: [['doseCourse1Gy', 'Dose course 1 (Gy)', 18], ['doseCourse2Gy', 'Dose course 2 (Gy)', 12], ['doseCourse3Gy', 'Dose course 3 (Gy)', 5]], compute: ({ doseCourse1Gy, doseCourse2Gy, doseCourse3Gy }) => doseCourse1Gy + doseCourse2Gy + doseCourse3Gy },
+      { id: 69, name: 'Re-irradiation Safety Ratio', unit: 'ratio', fields: [['cumulativeOarDoseGy', 'Cumulative OAR dose (Gy)', 35], ['oarToleranceGy', 'OAR tolerance (Gy)', 50]], compute: ({ cumulativeOarDoseGy, oarToleranceGy }) => safeDivide(cumulativeOarDoseGy, oarToleranceGy) },
+      { id: 70, name: 'Composite Clinical Score', unit: 'score', fields: [['targetCoverage', 'Target coverage', 0.95], ['ntcp', 'NTCP (0-1)', 0.18], ['efficiency', 'Efficiency ratio', 0.6]], compute: ({ targetCoverage, ntcp, efficiency }) => (0.5 * targetCoverage) + (0.3 * (1 - ntcp)) + (0.2 * efficiency) }
+    ]
+
   }
 ];
 
