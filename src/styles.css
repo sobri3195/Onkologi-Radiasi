@@ -169,6 +169,62 @@ body {
   opacity: 0.94;
 }
 
+.hero-actions {
+  margin-top: 0.75rem;
+  display: flex;
+  gap: 0.6rem;
+  align-items: end;
+  flex-wrap: wrap;
+}
+
+.inline-input {
+  margin: 0;
+}
+
+.inline-input label {
+  color: #e0f2fe;
+}
+
+.ghost-btn {
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(15, 23, 42, 0.22);
+  color: #f8fafc;
+  border-radius: 0.55rem;
+  padding: 0.54rem 0.75rem;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.ghost-btn:hover {
+  background: rgba(15, 23, 42, 0.35);
+}
+
+.empty-state {
+  background: #ffffff;
+  border: 1px dashed #94a3b8;
+  border-radius: 0.85rem;
+  padding: 1.1rem;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.empty-state h3,
+.empty-state p {
+  margin: 0;
+}
+
+.empty-state p {
+  color: #475569;
+  margin-top: 0.3rem;
+  margin-bottom: 0.8rem;
+}
+
+.empty-state .ghost-btn {
+  color: #0f172a;
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
 .content > section > h2 {
   margin: 0.2rem 0 0.65rem;
   color: #1e293b;
@@ -197,6 +253,27 @@ body {
 .card header h3 {
   margin: 0.1rem 0 0.7rem;
   font-size: 1rem;
+}
+
+.card header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.text-btn {
+  border: none;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-radius: 0.45rem;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.72rem;
+  cursor: pointer;
+  height: fit-content;
+}
+
+.text-btn:hover {
+  background: #dbeafe;
 }
 
 .card small {
@@ -276,6 +353,22 @@ body {
 
 .result-blocked {
   color: #b91c1c;
+}
+
+.copy-btn {
+  margin-top: 0.55rem;
+  width: 100%;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1e40af;
+  border-radius: 0.55rem;
+  padding: 0.45rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.copy-btn:hover {
+  background: #dbeafe;
 }
 
 @media (max-width: 980px) {
