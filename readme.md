@@ -5,7 +5,7 @@ Aplikasi ini sekarang dikonversi menjadi **React Admin Panel** yang siap deploy 
 ## Apa yang ditingkatkan
 
 - Migrasi dari script Python menjadi dashboard web interaktif.
-- Seluruh **50 fitur kalkulator** dipetakan ke UI form perhitungan real-time.
+- Seluruh **70 fitur kalkulator** dipetakan ke UI form perhitungan real-time, termasuk tambahan 20 modul lanjutan baru.
 - Struktur admin panel: sidebar, filter kategori, pencarian fitur, ringkasan statistik.
 - Konfigurasi deployment Vercel (`vercel.json`) sudah disiapkan.
 
