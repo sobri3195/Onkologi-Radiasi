@@ -40,7 +40,11 @@ const getFieldValidation = (field, rawValue) => {
 function App() {
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [sortMode, setSortMode] = useState('id');
+  const [copiedCalcId, setCopiedCalcId] = useState(null);
   const [values, setValues] = useState(getDefaultValues);
+
+  const defaultValues = useMemo(() => getDefaultValues(), []);
 
   const filteredCategories = useMemo(() => {
     const search = query.trim().toLowerCase();
@@ -51,14 +55,41 @@ function App() {
           const byCategory = selectedCategory === 'all' || selectedCategory === category.id;
           const bySearch = `${calc.name} ${category.title}`.toLowerCase().includes(search);
           return byCategory && bySearch;
+        }).sort((a, b) => {
+          if (sortMode === 'name') {
+            return a.name.localeCompare(b.name);
+          }
+          return a.id - b.id;
         })
       }))
       .filter((category) => category.calculators.length > 0);
-  }, [query, selectedCategory]);
+  }, [query, selectedCategory, sortMode]);
 
   const stats = {
     total: calculatorCategories.reduce((sum, category) => sum + category.calculators.length, 0),
     visible: filteredCategories.reduce((sum, category) => sum + category.calculators.length, 0)
+  };
+
+  const resetAll = () => {
+    setValues(defaultValues);
+    setCopiedCalcId(null);
+  };
+
+  const resetCalculator = (calcId) => {
+    setValues((prev) => ({
+      ...prev,
+      [calcId]: defaultValues[calcId]
+    }));
+  };
+
+  const copyResult = async (calcName, output, unit) => {
+    try {
+      await navigator.clipboard.writeText(`${calcName}: ${output}${unit ? ` ${unit}` : ''}`);
+      setCopiedCalcId(calcName);
+      setTimeout(() => setCopiedCalcId(null), 1600);
+    } catch {
+      setCopiedCalcId(null);
+    }
   };
 
   return (
@@ -128,7 +159,30 @@ function App() {
           <div className="content-hero">
             <h2>Dashboard Kalkulator Klinis</h2>
             <p>Gunakan panel di kiri untuk mencari dan memfilter kalkulator dengan lebih cepat.</p>
+            <div className="hero-actions">
+              <div className="input-group inline-input">
+                <label htmlFor="sort-mode">Urutkan</label>
+                <select id="sort-mode" value={sortMode} onChange={(event) => setSortMode(event.target.value)}>
+                  <option value="id">Nomor kalkulator</option>
+                  <option value="name">Nama kalkulator</option>
+                </select>
+              </div>
+              <button type="button" className="ghost-btn" onClick={resetAll}>Reset semua input</button>
+            </div>
           </div>
+
+          {stats.visible === 0 && (
+            <div className="empty-state">
+              <h3>Tidak ada kalkulator yang cocok</h3>
+              <p>Coba ubah kata kunci pencarian atau pilih kategori lain.</p>
+              <button type="button" className="ghost-btn" onClick={() => {
+                setQuery('');
+                setSelectedCategory('all');
+              }}>
+                Hapus filter
+              </button>
+            </div>
+          )}
 
           {filteredCategories.map((category) => (
             <section key={category.id}>
@@ -154,8 +208,11 @@ function App() {
                   return (
                     <article key={calc.id} className="card" style={{ borderTop: `4px solid ${category.color}` }}>
                       <header>
-                        <small>#{calc.id}</small>
-                        <h3>{calc.name}</h3>
+                        <div>
+                          <small>#{calc.id}</small>
+                          <h3>{calc.name}</h3>
+                        </div>
+                        <button type="button" className="text-btn" onClick={() => resetCalculator(calc.id)}>Reset</button>
                       </header>
                       {calc.fields.map((field) => {
                         const state = fieldValidation[field.key];
@@ -190,6 +247,15 @@ function App() {
                           <strong>{output} {calc.unit !== 'status' ? calc.unit : ''}</strong>
                         )}
                       </div>
+                      {!hasHardError && (
+                        <button
+                          type="button"
+                          className="copy-btn"
+                          onClick={() => copyResult(calc.id, output, calc.unit !== 'status' ? calc.unit : '')}
+                        >
+                          {copiedCalcId === calc.id ? 'Tersalin ✓' : 'Salin hasil'}
+                        </button>
+                      )}
                     </article>
                   );
                 })}
