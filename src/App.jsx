@@ -1,8 +1,11 @@
-import { useMemo, useState } from 'react';
-import { calculatorCategories } from './calculators';
+import { useEffect, useMemo, useState } from 'react';
+import { allCalculators, calculatorCategories } from './calculators';
 import './styles.css';
 
 const asNumber = (value) => Number(value || 0);
+const PINNED_KEY = 'pinned_calculators';
+const CUSTOM_PRESET_KEY = 'custom_presets';
+const HISTORY_KEY = 'calc_history';
 
 const getDefaultValues = () => {
   const initial = {};
@@ -37,14 +40,59 @@ const getFieldValidation = (field, rawValue) => {
   return { hardError: null, warning: null };
 };
 
+const readJsonStorage = (key, fallback) => {
+  try {
+    const data = localStorage.getItem(key);
+    return data ? JSON.parse(data) : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const formatTimestamp = (isoTime) => new Date(isoTime).toLocaleString('id-ID', { hour12: false });
+
+const toCsvValue = (value) => `"${String(value).replaceAll('"', '""')}"`;
+
+const downloadCsv = (filename, rows) => {
+  const csv = rows.map((row) => row.map(toCsvValue).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+};
+
 function App() {
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [sortMode, setSortMode] = useState('id');
   const [copiedCalcId, setCopiedCalcId] = useState(null);
   const [values, setValues] = useState(getDefaultValues);
+  const [pinnedIds, setPinnedIds] = useState([]);
+  const [customPresets, setCustomPresets] = useState({});
+  const [history, setHistory] = useState({});
 
   const defaultValues = useMemo(() => getDefaultValues(), []);
+
+  useEffect(() => {
+    setPinnedIds(readJsonStorage(PINNED_KEY, []));
+    setCustomPresets(readJsonStorage(CUSTOM_PRESET_KEY, {}));
+    setHistory(readJsonStorage(HISTORY_KEY, {}));
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(PINNED_KEY, JSON.stringify(pinnedIds));
+  }, [pinnedIds]);
+
+  useEffect(() => {
+    localStorage.setItem(CUSTOM_PRESET_KEY, JSON.stringify(customPresets));
+  }, [customPresets]);
+
+  useEffect(() => {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  }, [history]);
 
   const filteredCategories = useMemo(() => {
     const search = query.trim().toLowerCase();
@@ -70,6 +118,11 @@ function App() {
     visible: filteredCategories.reduce((sum, category) => sum + category.calculators.length, 0)
   };
 
+  const pinnedCalculators = useMemo(() => {
+    const pinnedSet = new Set(pinnedIds);
+    return allCalculators.filter((calc) => pinnedSet.has(calc.id));
+  }, [pinnedIds]);
+
   const resetAll = () => {
     setValues(defaultValues);
     setCopiedCalcId(null);
@@ -82,6 +135,46 @@ function App() {
     }));
   };
 
+  const togglePin = (calcId) => {
+    setPinnedIds((prev) => (prev.includes(calcId)
+      ? prev.filter((id) => id !== calcId)
+      : [...prev, calcId]));
+  };
+
+  const getPresetOptions = (calc) => {
+    const defaults = [
+      { id: 'default', name: 'Default', values: defaultValues[calc.id] }
+    ];
+    return [...defaults, ...(customPresets[calc.id] || [])];
+  };
+
+  const applyPreset = (calc, presetId) => {
+    const selected = getPresetOptions(calc).find((preset) => preset.id === presetId);
+    if (!selected) return;
+    setValues((prev) => ({ ...prev, [calc.id]: selected.values }));
+  };
+
+  const saveCustomPreset = (calc) => {
+    const presetName = window.prompt('Nama preset baru:');
+    if (!presetName) return;
+    const item = {
+      id: `custom-${Date.now()}`,
+      name: presetName.trim(),
+      values: values[calc.id]
+    };
+    setCustomPresets((prev) => ({
+      ...prev,
+      [calc.id]: [...(prev[calc.id] || []), item]
+    }));
+  };
+
+  const deleteCustomPreset = (calcId, presetId) => {
+    setCustomPresets((prev) => ({
+      ...prev,
+      [calcId]: (prev[calcId] || []).filter((preset) => preset.id !== presetId)
+    }));
+  };
+
   const copyResult = async (calcName, output, unit) => {
     try {
       await navigator.clipboard.writeText(`${calcName}: ${output}${unit ? ` ${unit}` : ''}`);
@@ -90,6 +183,45 @@ function App() {
     } catch {
       setCopiedCalcId(null);
     }
+  };
+
+  const addHistory = (calc, input, output) => {
+    const entry = {
+      id: `${Date.now()}-${Math.random()}`,
+      createdAt: new Date().toISOString(),
+      input,
+      output,
+      unit: calc.unit
+    };
+
+    setHistory((prev) => ({
+      ...prev,
+      [calc.id]: [entry, ...(prev[calc.id] || [])].slice(0, 20)
+    }));
+  };
+
+  const loadHistoryItem = (calcId, item) => {
+    setValues((prev) => ({ ...prev, [calcId]: item.input }));
+  };
+
+  const deleteHistoryItem = (calcId, itemId) => {
+    setHistory((prev) => ({
+      ...prev,
+      [calcId]: (prev[calcId] || []).filter((item) => item.id !== itemId)
+    }));
+  };
+
+  const exportHistoryCsv = (calc) => {
+    const items = history[calc.id] || [];
+    if (!items.length) return;
+    const headers = ['Waktu', 'Input', 'Output', 'Unit'];
+    const rows = items.map((item) => [
+      formatTimestamp(item.createdAt),
+      JSON.stringify(item.input),
+      item.output,
+      item.unit
+    ]);
+    downloadCsv(`history-${calc.id}.csv`, [headers, ...rows]);
   };
 
   return (
@@ -184,6 +316,19 @@ function App() {
             </div>
           )}
 
+          {pinnedCalculators.length > 0 && (
+            <section>
+              <h2>Pinned Calculators</h2>
+              <div className="pinned-wrap">
+                {pinnedCalculators.map((calc) => (
+                  <button key={calc.id} type="button" className="chip" onClick={() => setQuery(calc.name)}>
+                    ⭐ #{calc.id} {calc.name}
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+
           {filteredCategories.map((category) => (
             <section key={category.id}>
               <h2>{category.title}</h2>
@@ -212,8 +357,30 @@ function App() {
                           <small>#{calc.id}</small>
                           <h3>{calc.name}</h3>
                         </div>
-                        <button type="button" className="text-btn" onClick={() => resetCalculator(calc.id)}>Reset</button>
+                        <div className="card-actions">
+                          <button type="button" className="text-btn" onClick={() => togglePin(calc.id)}>
+                            {pinnedIds.includes(calc.id) ? '★ Unpin' : '☆ Pin'}
+                          </button>
+                          <button type="button" className="text-btn" onClick={() => resetCalculator(calc.id)}>Reset</button>
+                        </div>
                       </header>
+                      <div className="preset-row">
+                        <select defaultValue="default" onChange={(event) => applyPreset(calc, event.target.value)}>
+                          {getPresetOptions(calc).map((preset) => (
+                            <option key={preset.id} value={preset.id}>{preset.name}</option>
+                          ))}
+                        </select>
+                        <button type="button" className="text-btn" onClick={() => saveCustomPreset(calc)}>Simpan Preset</button>
+                        {(customPresets[calc.id] || []).length > 0 && (
+                          <button
+                            type="button"
+                            className="text-btn"
+                            onClick={() => deleteCustomPreset(calc.id, customPresets[calc.id][customPresets[calc.id].length - 1].id)}
+                          >
+                            Hapus Preset Terakhir
+                          </button>
+                        )}
+                      </div>
                       {calc.fields.map((field) => {
                         const state = fieldValidation[field.key];
                         const stateClass = state.hardError ? 'input-error' : state.warning ? 'input-warning' : '';
@@ -248,14 +415,38 @@ function App() {
                         )}
                       </div>
                       {!hasHardError && (
-                        <button
-                          type="button"
-                          className="copy-btn"
-                          onClick={() => copyResult(calc.id, output, calc.unit !== 'status' ? calc.unit : '')}
-                        >
-                          {copiedCalcId === calc.id ? 'Tersalin ✓' : 'Salin hasil'}
-                        </button>
+                        <div className="result-actions">
+                          <button
+                            type="button"
+                            className="copy-btn"
+                            onClick={() => copyResult(calc.id, output, calc.unit !== 'status' ? calc.unit : '')}
+                          >
+                            {copiedCalcId === calc.id ? 'Tersalin ✓' : 'Salin hasil'}
+                          </button>
+                          <button type="button" className="copy-btn secondary" onClick={() => addHistory(calc, values[calc.id], output)}>
+                            Simpan riwayat
+                          </button>
+                        </div>
                       )}
+                      <details className="history-box">
+                        <summary>Riwayat ({(history[calc.id] || []).length})</summary>
+                        <div className="history-actions">
+                          <button type="button" className="text-btn" onClick={() => exportHistoryCsv(calc)}>Export CSV</button>
+                          <button type="button" className="text-btn" onClick={() => setHistory((prev) => ({ ...prev, [calc.id]: [] }))}>Clear</button>
+                        </div>
+                        <ul>
+                          {(history[calc.id] || []).map((item) => (
+                            <li key={item.id}>
+                              <small>{formatTimestamp(item.createdAt)}</small>
+                              <span>{item.output} {calc.unit !== 'status' ? calc.unit : ''}</span>
+                              <div>
+                                <button type="button" className="text-btn" onClick={() => loadHistoryItem(calc.id, item)}>Load</button>
+                                <button type="button" className="text-btn" onClick={() => deleteHistoryItem(calc.id, item.id)}>Hapus</button>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
                     </article>
                   );
                 })}
