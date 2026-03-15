@@ -1,28 +1,69 @@
-# Onkologi Radiasi Admin Panel (React + Vercel)
+# Onkologi Radiasi – Clinical Calculation Workspace
 
-Aplikasi ini sekarang dikonversi menjadi **React Admin Panel** yang siap deploy di **Vercel**.
+Aplikasi web berbasis **React + Vite** untuk membantu simulasi kalkulasi onkologi radiasi secara cepat, terstruktur, dan dapat dieksplorasi per kategori klinis.
 
-## Apa yang ditingkatkan
+> ⚠️ **Disclaimer klinis:** aplikasi ini adalah alat bantu edukasi/perencanaan. Tidak menggantikan keputusan klinis dokter, fisikawan medis, atau tim multidisiplin.
 
-- Migrasi dari script Python menjadi dashboard web interaktif.
-- Seluruh **70 fitur kalkulator** dipetakan ke UI form perhitungan real-time, termasuk tambahan 20 modul lanjutan baru.
-- Struktur admin panel: sidebar, filter kategori, pencarian fitur, ringkasan statistik.
-- Konfigurasi deployment Vercel (`vercel.json`) sudah disiapkan.
+## Fitur Utama
 
-## Stack
+- Dashboard kalkulator dengan pencarian, filter kategori, sorting, pin kalkulator favorit, dan reset cepat.
+- Validasi input (hard limit + rentang rekomendasi klinis).
+- Preset (default + custom), histori perhitungan, dan export histori ke CSV.
+- Total **86 kalkulator** yang dikelompokkan per domain radioterapi.
+
+## Kategori Kalkulator
+
+### 1) Dosis Dasar
+Kalkulator inti seperti BED, EQD2, TCP/NTCP, PDD, TAR, TMR, MU, hingga dose rate brachy.
+
+### 2) Volume & Geometri
+Volume tumor (spherical/ellipsoid), PTV, conformity/homogeneity index, DVH point, equivalent sphere diameter, dll.
+
+### 3) Koreksi & Faktor
+Inverse square law, koreksi setup/faktor lapangan, bobot biologis, timing, dan parameter koreksi lain.
+
+### 4) Modul Lanjutan
+Analitik lanjutan seperti dose escalation gain, BED/EQD2 difference, plan benefit, adaptive replan trigger, hingga composite clinical score.
+
+### 5) **Klaster Serviks** *(baru)*
+- Point A EQD2
+- Overall Treatment Time Penalty (Serviks)
+- HR-CTV Coverage Ratio
+- OAR D2cc Safety (Bladder)
+
+### 6) **Klaster Kepala-Leher** *(baru)*
+- Parotid Mean Dose Risk
+- Larynx Edema Risk Index
+- Nodal Burden Index
+- Feeding Tube Probability Score
+
+### 7) **Klaster Toksisitas Radioterapi** *(baru)*
+- Mucositis Risk Score
+- Radiodermatitis Severity Index
+- Pneumonitis Risk (%)
+- Late Fibrosis Index
+
+### 8) **Klaster Faktor Hematologi-Nutrisi** *(baru)*
+- NLR (Neutrophil-Lymphocyte Ratio)
+- PLR (Platelet-Lymphocyte Ratio)
+- Prognostic Nutrition Index (PNI)
+- Hemoglobin Adequacy Ratio
+
+## Teknologi
 
 - React 18
 - Vite 5
-- Vercel (static deploy)
+- CSS custom
+- Deploy-ready untuk Vercel
 
-## Jalankan Lokal
+## Menjalankan Lokal
 
 ```bash
 npm install
 npm run dev
 ```
 
-Akses: `http://localhost:5173`
+Akses di browser: `http://localhost:5173`
 
 ## Build Produksi
 
@@ -31,22 +72,29 @@ npm run build
 npm run preview
 ```
 
+## Struktur File Kunci
+
+- `src/App.jsx` — UI dashboard, state management, validasi, histori, preset.
+- `src/calculators.js` — seluruh definisi kategori + rumus kalkulator.
+- `src/styles.css` — styling antarmuka.
+
 ## Deploy ke Vercel
 
-### Opsi 1 — via dashboard Vercel
-1. Import repository ini di Vercel.
-2. Framework: auto detect (Vite).
-3. Build command: `npm run build`
-4. Output directory: `dist`
-5. Deploy.
+1. Import repository ke Vercel.
+2. Build command: `npm run build`
+3. Output directory: `dist`
+4. Deploy.
 
-### Opsi 2 — via Vercel CLI
+Atau via CLI:
+
 ```bash
 npm i -g vercel
 vercel
 ```
 
-## Catatan
+---
 
-- `radiation_oncology_calc.py` tetap disertakan sebagai referensi rumus asli.
-- Ini alat edukasi/perencanaan bantu, bukan pengganti keputusan klinis dokter fisika medis.
+Jika diinginkan, tahap berikutnya bisa ditambah:
+- mode **clinical pathways** per site penyakit,
+- template protokol fraksinasi,
+- scoring komposit otomatis dari beberapa kalkulator.

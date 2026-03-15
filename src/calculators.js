@@ -152,6 +152,62 @@ const categories = [
       { id: 70, name: 'Composite Clinical Score', unit: 'score', fields: [['targetCoverage', 'Target coverage', 0.95], ['ntcp', 'NTCP (0-1)', 0.18], ['efficiency', 'Efficiency ratio', 0.6]], compute: ({ targetCoverage, ntcp, efficiency }) => (0.5 * targetCoverage) + (0.3 * (1 - ntcp)) + (0.2 * efficiency) }
     ]
 
+  },
+  {
+    id: 'klaster-serviks',
+    title: 'Klaster Serviks',
+    color: '#be123c',
+    calculators: [
+      { id: 71, name: 'Point A EQD2', unit: 'Gy', fields: [['externalBeamDoseGy', 'EBRT dose (Gy)', 45], ['brachyDoseGy', 'Brachy dose total (Gy)', 28], ['brachyFractions', 'Brachy fractions', 4], ['alphaBeta', 'α/β tumor', 10]], compute: ({ externalBeamDoseGy, brachyDoseGy, brachyFractions, alphaBeta }) => {
+        const brachyDosePerFx = safeDivide(brachyDoseGy, brachyFractions);
+        const bedTotal = externalBeamDoseGy * (1 + (safeDivide(externalBeamDoseGy, 25) / alphaBeta)) + (brachyDoseGy * (1 + brachyDosePerFx / alphaBeta));
+        return safeDivide(bedTotal, 1 + 2 / alphaBeta);
+      } },
+      { id: 72, name: 'Overall Treatment Time Penalty (Serviks)', unit: 'Gy', fields: [['actualTreatmentDays', 'Actual treatment time (days)', 56], ['benchmarkDays', 'Benchmark OTT (days)', 49], ['lossPerDayGy', 'Dose loss/day beyond benchmark (Gy)', 0.6]], compute: ({ actualTreatmentDays, benchmarkDays, lossPerDayGy }) => (actualTreatmentDays > benchmarkDays ? (actualTreatmentDays - benchmarkDays) * lossPerDayGy : 0) },
+      { id: 73, name: 'HR-CTV Coverage Ratio', unit: 'ratio', fields: [['d90Gy', 'D90 HR-CTV (Gy)', 85], ['targetEqd2Gy', 'Target EQD2 (Gy)', 85]], compute: ({ d90Gy, targetEqd2Gy }) => safeDivide(d90Gy, targetEqd2Gy) },
+      { id: 74, name: 'OAR D2cc Safety (Bladder)', unit: 'ratio', fields: [['bladderD2ccGy', 'Bladder D2cc EQD2 (Gy)', 78], ['constraintGy', 'Constraint EQD2 (Gy)', 90]], compute: ({ bladderD2ccGy, constraintGy }) => safeDivide(bladderD2ccGy, constraintGy) }
+    ]
+
+  },
+  {
+    id: 'klaster-kepala-leher',
+    title: 'Klaster Kepala-Leher',
+    color: '#0f766e',
+    calculators: [
+      { id: 75, name: 'Parotid Mean Dose Risk', unit: '%', fields: [['meanDoseGy', 'Parotid mean dose (Gy)', 24], ['d50Gy', 'D50 xerostomia (Gy)', 39], ['slope', 'Slope', 2]], compute: ({ meanDoseGy, d50Gy, slope }) => 100 * (1 / (1 + (safeDivide(d50Gy, meanDoseGy)) ** (4 * slope))) },
+      { id: 76, name: 'Larynx Edema Risk Index', unit: 'ratio', fields: [['meanLarynxDoseGy', 'Larynx mean dose (Gy)', 42], ['thresholdGy', 'Larynx threshold (Gy)', 44]], compute: ({ meanLarynxDoseGy, thresholdGy }) => safeDivide(meanLarynxDoseGy, thresholdGy) },
+      { id: 77, name: 'Nodal Burden Index', unit: 'score', fields: [['largestNodeCm', 'Largest node diameter (cm)', 3.2], ['numberPositiveNodes', 'Number of positive nodes', 4], ['bilateralInvolvement', 'Bilateral involvement (0/1)', 1]], compute: ({ largestNodeCm, numberPositiveNodes, bilateralInvolvement }) => (largestNodeCm * 0.5) + (numberPositiveNodes * 0.8) + (bilateralInvolvement * 1.5) },
+      { id: 78, name: 'Feeding Tube Probability Score', unit: '%', fields: [['pharyngealConstrDoseGy', 'Pharyngeal constrictor mean dose (Gy)', 55], ['baselineBmi', 'Baseline BMI', 20], ['weightLossPercent', 'Weight loss (%)', 8]], compute: ({ pharyngealConstrDoseGy, baselineBmi, weightLossPercent }) => {
+        const doseComponent = safeDivide(pharyngealConstrDoseGy, 70);
+        const bmiComponent = baselineBmi < 18.5 ? 0.25 : 0.1;
+        return Math.min(100, (doseComponent + bmiComponent + safeDivide(weightLossPercent, 30)) * 100);
+      } }
+    ]
+
+  },
+  {
+    id: 'klaster-toksisitas-radioterapi',
+    title: 'Klaster Toksisitas Radioterapi',
+    color: '#b45309',
+    calculators: [
+      { id: 79, name: 'Mucositis Risk Score', unit: 'score', fields: [['oralCavityMeanDoseGy', 'Oral cavity mean dose (Gy)', 36], ['concurrentChemo', 'Concurrent chemo (0/1)', 1], ['smokingStatus', 'Active smoker (0/1)', 0]], compute: ({ oralCavityMeanDoseGy, concurrentChemo, smokingStatus }) => (oralCavityMeanDoseGy * 0.08) + (concurrentChemo * 2.2) + (smokingStatus * 1.1) },
+      { id: 80, name: 'Radiodermatitis Severity Index', unit: 'score', fields: [['skinDoseGy', 'Skin max dose (Gy)', 52], ['fractionDoseGy', 'Dose/fraction (Gy)', 2], ['bolusDays', 'Bolus use (days)', 10]], compute: ({ skinDoseGy, fractionDoseGy, bolusDays }) => (skinDoseGy * 0.05) + (fractionDoseGy * 1.5) + (bolusDays * 0.07) },
+      { id: 81, name: 'Pneumonitis Risk (%)', unit: '%', fields: [['lungV20', 'Lung V20 (%)', 28], ['meanLungDoseGy', 'Mean lung dose (Gy)', 16], ['concurrentImmunotherapy', 'Concurrent immunotherapy (0/1)', 0]], compute: ({ lungV20, meanLungDoseGy, concurrentImmunotherapy }) => Math.min(100, (lungV20 * 0.9) + (meanLungDoseGy * 1.4) + (concurrentImmunotherapy * 8)) },
+      { id: 82, name: 'Late Fibrosis Index', unit: 'ratio', fields: [['eqd2Gy', 'Delivered EQD2 (Gy)', 66], ['normalTissueAlphaBeta', 'Normal tissue α/β', 3], ['volumeOver50Gy', 'Volume >50 Gy (%)', 35]], compute: ({ eqd2Gy, normalTissueAlphaBeta, volumeOver50Gy }) => safeDivide((eqd2Gy / normalTissueAlphaBeta) * volumeOver50Gy, 100) }
+    ]
+
+  },
+  {
+    id: 'klaster-hematologi-nutrisi',
+    title: 'Klaster Faktor Hematologi-Nutrisi',
+    color: '#4338ca',
+    calculators: [
+      { id: 83, name: 'NLR (Neutrophil-Lymphocyte Ratio)', unit: 'ratio', fields: [['neutrophilCount', 'Neutrophil count (10^9/L)', 4.8], ['lymphocyteCount', 'Lymphocyte count (10^9/L)', 1.6]], compute: ({ neutrophilCount, lymphocyteCount }) => safeDivide(neutrophilCount, lymphocyteCount) },
+      { id: 84, name: 'PLR (Platelet-Lymphocyte Ratio)', unit: 'ratio', fields: [['plateletCount', 'Platelet count (10^9/L)', 320], ['lymphocyteCount', 'Lymphocyte count (10^9/L)', 1.6]], compute: ({ plateletCount, lymphocyteCount }) => safeDivide(plateletCount, lymphocyteCount) },
+      { id: 85, name: 'Prognostic Nutrition Index (PNI)', unit: 'score', fields: [['albuminGdl', 'Albumin (g/dL)', 3.8], ['lymphocytePerMm3', 'Lymphocyte count (/mm³)', 1400]], compute: ({ albuminGdl, lymphocytePerMm3 }) => (10 * albuminGdl) + (0.005 * lymphocytePerMm3) },
+      { id: 86, name: 'Hemoglobin Adequacy Ratio', unit: 'ratio', fields: [['hemoglobinGdl', 'Hemoglobin (g/dL)', 11.5], ['targetHemoglobinGdl', 'Target hemoglobin (g/dL)', 12]], compute: ({ hemoglobinGdl, targetHemoglobinGdl }) => safeDivide(hemoglobinGdl, targetHemoglobinGdl) }
+    ]
+
   }
 ];
 
