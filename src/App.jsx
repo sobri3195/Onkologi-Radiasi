@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { allCalculators, calculatorCategories } from './calculators';
 import './styles.css';
 
@@ -6,6 +6,7 @@ const asNumber = (value) => Number(value || 0);
 const PINNED_KEY = 'pinned_calculators';
 const CUSTOM_PRESET_KEY = 'custom_presets';
 const HISTORY_KEY = 'calc_history';
+const VALUES_KEY = 'calc_values';
 
 const getDefaultValues = () => {
   const initial = {};
@@ -64,7 +65,13 @@ const downloadCsv = (filename, rows) => {
   URL.revokeObjectURL(url);
 };
 
+const getRecentHistoryItems = (history) => Object.entries(history)
+  .flatMap(([calcId, items]) => (items || []).map((item) => ({ ...item, calcId: Number(calcId) })))
+  .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+  .slice(0, 8);
+
 function App() {
+  const fileInputRef = useRef(null);
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [sortMode, setSortMode] = useState('id');
@@ -73,6 +80,8 @@ function App() {
   const [pinnedIds, setPinnedIds] = useState([]);
   const [customPresets, setCustomPresets] = useState({});
   const [history, setHistory] = useState({});
+  const [selectedPresetIds, setSelectedPresetIds] = useState({});
+  const [workspaceStatus, setWorkspaceStatus] = useState('');
 
   const defaultValues = useMemo(() => getDefaultValues(), []);
 
@@ -80,6 +89,7 @@ function App() {
     setPinnedIds(readJsonStorage(PINNED_KEY, []));
     setCustomPresets(readJsonStorage(CUSTOM_PRESET_KEY, {}));
     setHistory(readJsonStorage(HISTORY_KEY, {}));
+    setValues((prev) => ({ ...prev, ...readJsonStorage(VALUES_KEY, {}) }));
   }, []);
 
   useEffect(() => {
@@ -93,6 +103,16 @@ function App() {
   useEffect(() => {
     localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
   }, [history]);
+
+  useEffect(() => {
+    localStorage.setItem(VALUES_KEY, JSON.stringify(values));
+  }, [values]);
+
+  useEffect(() => {
+    if (!workspaceStatus) return;
+    const timer = setTimeout(() => setWorkspaceStatus(''), 2200);
+    return () => clearTimeout(timer);
+  }, [workspaceStatus]);
 
   const filteredCategories = useMemo(() => {
     const search = query.trim().toLowerCase();
@@ -115,8 +135,11 @@ function App() {
 
   const stats = {
     total: calculatorCategories.reduce((sum, category) => sum + category.calculators.length, 0),
-    visible: filteredCategories.reduce((sum, category) => sum + category.calculators.length, 0)
+    visible: filteredCategories.reduce((sum, category) => sum + category.calculators.length, 0),
+    pinned: pinnedIds.length
   };
+
+  const recentHistory = useMemo(() => getRecentHistoryItems(history), [history]);
 
   const pinnedCalculators = useMemo(() => {
     const pinnedSet = new Set(pinnedIds);
@@ -126,6 +149,7 @@ function App() {
   const resetAll = () => {
     setValues(defaultValues);
     setCopiedCalcId(null);
+    setSelectedPresetIds({});
   };
 
   const resetCalculator = (calcId) => {
@@ -133,6 +157,7 @@ function App() {
       ...prev,
       [calcId]: defaultValues[calcId]
     }));
+    setSelectedPresetIds((prev) => ({ ...prev, [calcId]: 'default' }));
   };
 
   const togglePin = (calcId) => {
@@ -152,6 +177,7 @@ function App() {
     const selected = getPresetOptions(calc).find((preset) => preset.id === presetId);
     if (!selected) return;
     setValues((prev) => ({ ...prev, [calc.id]: selected.values }));
+    setSelectedPresetIds((prev) => ({ ...prev, [calc.id]: presetId }));
   };
 
   const saveCustomPreset = (calc) => {
@@ -166,6 +192,7 @@ function App() {
       ...prev,
       [calc.id]: [...(prev[calc.id] || []), item]
     }));
+    setSelectedPresetIds((prev) => ({ ...prev, [calc.id]: item.id }));
   };
 
   const deleteCustomPreset = (calcId, presetId) => {
@@ -173,12 +200,13 @@ function App() {
       ...prev,
       [calcId]: (prev[calcId] || []).filter((preset) => preset.id !== presetId)
     }));
+    setSelectedPresetIds((prev) => ({ ...prev, [calcId]: 'default' }));
   };
 
-  const copyResult = async (calcName, output, unit) => {
+  const copyResult = async (calcId, calcName, output, unit) => {
     try {
       await navigator.clipboard.writeText(`${calcName}: ${output}${unit ? ` ${unit}` : ''}`);
-      setCopiedCalcId(calcName);
+      setCopiedCalcId(calcId);
       setTimeout(() => setCopiedCalcId(null), 1600);
     } catch {
       setCopiedCalcId(null);
@@ -224,6 +252,64 @@ function App() {
     downloadCsv(`history-${calc.id}.csv`, [headers, ...rows]);
   };
 
+  const exportWorkspaceBackup = () => {
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      version: 1,
+      values,
+      pinnedIds,
+      customPresets,
+      history
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `onkologi-radiasi-backup-${Date.now()}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    setWorkspaceStatus('Backup berhasil diunduh.');
+  };
+
+  const importWorkspaceBackup = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      if (typeof parsed !== 'object' || parsed === null) {
+        throw new Error('Format backup tidak valid.');
+      }
+
+      setValues((prev) => ({ ...prev, ...(parsed.values || {}) }));
+      setPinnedIds(Array.isArray(parsed.pinnedIds) ? parsed.pinnedIds : []);
+      setCustomPresets(parsed.customPresets && typeof parsed.customPresets === 'object' ? parsed.customPresets : {});
+      setHistory(parsed.history && typeof parsed.history === 'object' ? parsed.history : {});
+      setWorkspaceStatus('Backup berhasil dipulihkan.');
+    } catch {
+      setWorkspaceStatus('Gagal import backup. Pastikan file JSON valid.');
+    } finally {
+      event.target.value = '';
+    }
+  };
+
+  const clearWorkspace = () => {
+    const confirmed = window.confirm('Hapus semua data lokal? (pin, preset, history, dan input)');
+    if (!confirmed) return;
+
+    setValues(defaultValues);
+    setPinnedIds([]);
+    setCustomPresets({});
+    setHistory({});
+    setSelectedPresetIds({});
+    localStorage.removeItem(PINNED_KEY);
+    localStorage.removeItem(CUSTOM_PRESET_KEY);
+    localStorage.removeItem(HISTORY_KEY);
+    localStorage.removeItem(VALUES_KEY);
+    setWorkspaceStatus('Seluruh data lokal berhasil dihapus.');
+  };
+
   return (
     <div className="app-shell">
       <div className="layout">
@@ -241,6 +327,7 @@ function App() {
               <div><strong>{stats.total}</strong><span>Total Kalkulator</span></div>
               <div><strong>{calculatorCategories.length}</strong><span>Kategori</span></div>
               <div><strong>{stats.visible}</strong><span>Ditampilkan</span></div>
+              <div><strong>{stats.pinned}</strong><span>Pinned</span></div>
             </div>
           </div>
 
@@ -285,12 +372,55 @@ function App() {
               ))}
             </div>
           </div>
+
+          <div className="sidebar-block workspace-block">
+            <h4>Workspace</h4>
+            <div className="workspace-actions">
+              <button type="button" className="ghost-btn" onClick={exportWorkspaceBackup}>Export Backup</button>
+              <button type="button" className="ghost-btn" onClick={() => fileInputRef.current?.click()}>Import Backup</button>
+              <button type="button" className="ghost-btn danger" onClick={clearWorkspace}>Reset Data Lokal</button>
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/json"
+              onChange={importWorkspaceBackup}
+              className="hidden-file"
+            />
+            {workspaceStatus && <p className="workspace-status">{workspaceStatus}</p>}
+          </div>
+
+          {recentHistory.length > 0 && (
+            <div className="sidebar-block recent-block">
+              <h4>Aktivitas Terbaru</h4>
+              <ul>
+                {recentHistory.map((item) => {
+                  const calc = allCalculators.find((entry) => entry.id === item.calcId);
+                  return (
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setQuery(calc?.name || '');
+                          setSelectedCategory(calc?.categoryId || 'all');
+                        }}
+                      >
+                        <strong>#{item.calcId} {calc?.name || 'Kalkulator'}</strong>
+                        <span>{item.output} {item.unit !== 'status' ? item.unit : ''}</span>
+                        <small>{formatTimestamp(item.createdAt)}</small>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
         </aside>
 
         <main className="content">
           <div className="content-hero">
             <h2>Dashboard Kalkulator Klinis</h2>
-            <p>Gunakan panel di kiri untuk mencari dan memfilter kalkulator dengan lebih cepat.</p>
+            <p>Gunakan panel di kiri untuk mencari, memfilter, backup data, dan meninjau aktivitas terbaru.</p>
             <div className="hero-actions">
               <div className="input-group inline-input">
                 <label htmlFor="sort-mode">Urutkan</label>
@@ -321,7 +451,15 @@ function App() {
               <h2>Pinned Calculators</h2>
               <div className="pinned-wrap">
                 {pinnedCalculators.map((calc) => (
-                  <button key={calc.id} type="button" className="chip" onClick={() => setQuery(calc.name)}>
+                  <button
+                    key={calc.id}
+                    type="button"
+                    className="chip"
+                    onClick={() => {
+                      setQuery(calc.name);
+                      setSelectedCategory(calc.categoryId);
+                    }}
+                  >
                     ⭐ #{calc.id} {calc.name}
                   </button>
                 ))}
@@ -331,7 +469,7 @@ function App() {
 
           {filteredCategories.map((category) => (
             <section key={category.id}>
-              <h2>{category.title}</h2>
+              <h2>{category.title} <small>({category.calculators.length})</small></h2>
               <div className="grid">
                 {category.calculators.map((calc) => {
                   const payload = Object.fromEntries(
@@ -342,6 +480,7 @@ function App() {
                     calc.fields.map((field) => [field.key, getFieldValidation(field, values[calc.id][field.key])])
                   );
                   const hasHardError = Object.values(fieldValidation).some((state) => state.hardError);
+                  const warningCount = Object.values(fieldValidation).filter((state) => state.warning).length;
 
                   const result = !hasHardError ? calc.compute(payload) : null;
                   const output = calc.formatter
@@ -349,6 +488,8 @@ function App() {
                     : Number.isFinite(result)
                       ? result.toFixed(4)
                       : '∞';
+
+                  const selectedPresetId = selectedPresetIds[calc.id] || 'default';
 
                   return (
                     <article key={calc.id} className="card" style={{ borderTop: `4px solid ${category.color}` }}>
@@ -358,6 +499,7 @@ function App() {
                           <h3>{calc.name}</h3>
                         </div>
                         <div className="card-actions">
+                          {warningCount > 0 && <span className="warning-pill">⚠ {warningCount}</span>}
                           <button type="button" className="text-btn" onClick={() => togglePin(calc.id)}>
                             {pinnedIds.includes(calc.id) ? '★ Unpin' : '☆ Pin'}
                           </button>
@@ -365,7 +507,7 @@ function App() {
                         </div>
                       </header>
                       <div className="preset-row">
-                        <select defaultValue="default" onChange={(event) => applyPreset(calc, event.target.value)}>
+                        <select value={selectedPresetId} onChange={(event) => applyPreset(calc, event.target.value)}>
                           {getPresetOptions(calc).map((preset) => (
                             <option key={preset.id} value={preset.id}>{preset.name}</option>
                           ))}
@@ -375,9 +517,11 @@ function App() {
                           <button
                             type="button"
                             className="text-btn"
-                            onClick={() => deleteCustomPreset(calc.id, customPresets[calc.id][customPresets[calc.id].length - 1].id)}
+                            onClick={() => deleteCustomPreset(calc.id, selectedPresetId)}
+                            disabled={selectedPresetId === 'default'}
+                            title={selectedPresetId === 'default' ? 'Pilih preset custom dulu' : 'Hapus preset terpilih'}
                           >
-                            Hapus Preset Terakhir
+                            Hapus Preset
                           </button>
                         )}
                       </div>
@@ -419,7 +563,7 @@ function App() {
                           <button
                             type="button"
                             className="copy-btn"
-                            onClick={() => copyResult(calc.id, output, calc.unit !== 'status' ? calc.unit : '')}
+                            onClick={() => copyResult(calc.id, calc.name, output, calc.unit !== 'status' ? calc.unit : '')}
                           >
                             {copiedCalcId === calc.id ? 'Tersalin ✓' : 'Salin hasil'}
                           </button>
